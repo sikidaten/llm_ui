@@ -1,0 +1,4 @@
+http://localhost:8501にアクセスする
+ログインする,idはdemo@demo.com, passwordはpasswordpassword
+注文画面に行く
+JSONでエクスポートする
