@@ -1,4 +1,3 @@
-http://localhost:8501にアクセスする
-ログインする,idはdemo@demo.com, passwordはpasswordpassword
-注文画面に行く
-JSONでエクスポートする
+http://localhost:3000/にアクセスする
+ログインする,idはadmin, passwordはdemo123
+po_sample.jpgを読み取り、その内容を入力する。

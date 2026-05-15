@@ -10,12 +10,58 @@ from playwright_stealth.stealth import Stealth
 import json
 import re
 
-from utils import chat_with_gpt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WORK_DIR = os.path.join(BASE_DIR, "work")
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "./")
 
+import base64
+
+# Function to encode the image
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
+from openai import OpenAI
+
+def chat_with_gpt(message: str, images=None) -> str:
+    # print(f"Message: {message}")
+    """
+    Send a message (and optional images) to ChatGPT and get a response.
+    Args:
+        message: The user message to send
+        images: List of image URLs (optional)
+    Returns:
+        The assistant's response
+    """
+    with open("api.key", "r", encoding="utf-8") as f:
+        api_key = f.read().strip()
+    client = OpenAI(
+        api_key=api_key
+    )
+    # Build the input structure as in the JS example
+    content = [
+        {"type": "input_text", "text": message}
+    ]
+    if images:
+        for image in images:
+            img_url = encode_image(image)
+            content.append({"type": "input_image", "image_url": f"data:image/jpeg;base64,{img_url}"})
+    response = client.responses.create(
+        model="gpt-5.5",
+        reasoning={'effort': 'none'},
+        input=[
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+    )
+    print(response.output_text)
+    # time.sleep(2)
+    print("========================================")
+    return response.output_text
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
@@ -93,7 +139,7 @@ def action(browser,purpose):
     save_screenshot(page)
     # exit()
     ret = chat_with_gpt(
-        f"WEBのスクリーンショットが与えられます。\n目的:{purpose}、\nこの目的を実行したいです。実行すべき最低限必要な処理だけを記載してください。実行すべきPlaywrightのコードをPYTHONで生成してください:生成されたコードはexecで実実行されます。コードは最低限でいいです。現在Playwrightを実行中でページを開いていて、新たに起動する必要はありません。page変数は定義されています。awaitもつけないでください。各アクションの後は固定待機を使わず、必要ならpage.wait_for_load_state(\"networkidle\")を使ってください。fillするときもDelayを人間らしく200以上でランダムでキリが悪い値をハードコーディングで置いてください。Fillするときは適度にDelayしてください。ダウンロードやエクスポートの操作なら必ずwith page.expect_download() as download_info: を使ってクリックし、その後 download = download_info.value として save_download(download) を呼んでください。ダウンロード結果は result = save_download(download) のように result に代入してください。テキスト取得など確認結果がある場合も result に文字列を入れてください。アクションが成功したか失敗したかメッセージでわかるようにしてください。このファイル全体のコードを参考にしてください。\n{script_source=}\n{html=}",
+        f"WEBのスクリーンショットとHTMLが与えられます。\n目的:{purpose}、\nこの目的を実行したいです。実行すべき最低限必要な処理だけを記載してください。実行すべきPlaywrightのコードをPYTHONで生成してください:生成されたコードはexecで実実行されます。コードは最低限でいいです。現在Playwrightを実行中でページを開いていて、新たに起動する必要はありません。page変数は定義されています。awaitもつけないでください。各アクションの後は固定待機を使わず、必要ならpage.wait_for_load_state(\"networkidle\")を使ってください。Fillするときは適度にDelayしてください。ただしError occurred while executing generated code: Locator.fill() got an unexpected keyword argument 'delay'に注意してください。ダウンロードやエクスポートの操作なら必ずwith page.expect_download() as download_info: を使ってクリックし、その後 download = download_info.value として save_download(download) を呼んでください。ダウンロード結果は result = save_download(download) のように result に代入してください。テキスト取得など確認結果がある場合も result に文字列を入れてください。アクションが成功したか失敗したかメッセージでわかるようにしてください。画像を読み取って解析が必要な場合は、chat_with_gptを用いることがおすすめです。ただし呼び出し回数が増えないように、複数の画像や項目をまとめてよみとるなど回数を減らす工夫をしてください。この実行ファイルのコードを参考にしてください。\n{script_source=}\n\n\n\n\nこれはこのページのHTMLです。コード生成の参考にしてください。入力時はその項目が見えるようにスクロールしてから入力してください。:\n{html}",
         images=[get_latest_screenshot_image_path()]
     )
     print(ret)
@@ -142,19 +188,19 @@ with sync_playwright() as p:
     context.on("download", save_download)
     page = context.new_page()
     # Stealth().apply_stealth_sync(page)
-    page.goto("http://localhost:8501", wait_until="networkidle")
+    page.goto("http://localhost:3000", wait_until="networkidle")
     # page.wait_for_load_state("networkidle")
     # check_login_needed(browser)
     # with open("config/xero.json","r") as f:
         # config=json.load(f)
     memory=''
-    with open(os.path.join(BASE_DIR, "action.txt"),'r') as f:
+    with open(os.path.join(BASE_DIR, "action.txt"),'r', encoding="utf-8") as f:
         memory=f.read()
-    memory='<---Current Point'+memory
+    memory='<---Current Point\n'+memory
     while True:
         page.wait_for_load_state("networkidle")
         save_screenshot(page)
-        ret=chat_with_gpt(f'memoryに記載された一連のアクションを実行したいです。ここには現在位置が記載されています。画面のスクショを見て、次に行うべきアクションを決定してください。updateされたmemoryと次のアクションをjsonで記載してください.memoryにはアクションの全体や現在位置、書き残すべきことを記載してください。例{{"memory":"<memory_content>", "nextaction":"<nextaction_content>"}}。もしアクションが終了したら一言DONEと返してください。\n{memory}',images=[get_latest_screenshot_image_path()])
+        ret=chat_with_gpt(f'memoryに記載された一連のアクションを実行したいです。ここには現在位置が記載されています。画面のスクショを見て、次に行うべきアクションを決定してください。updateされたmemoryと次のアクションをjsonで記載してください.memoryにはアクションの全体や現在位置、書き残すべきことを記載してください。例{{"memory":"<memory_content>", "nextaction":"<nextaction_content>"}}。もしアクションが終了したら一言DONEと返してください。1ステップごとにコストがかかるので、同じ画面での複数項目の入力などはまとめてください\n{memory}',images=[get_latest_screenshot_image_path()])
         if 'DONE' in ret:
             print("All actions completed.")
             input()
