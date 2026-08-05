@@ -1,0 +1,7 @@
+# API credentials - never commit
+api.key
+
+# Runtime artifacts
+work/
+__pycache__/
+*.pyc
